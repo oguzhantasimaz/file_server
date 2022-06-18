@@ -1,69 +1,119 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"math"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
 )
 
-const BufferSize = 100
+const BufferSize = 5
 
-// containsDotFile reports whether name contains a path element starting with a period.
-// The name is assumed to be a delimited by forward slashes, as guaranteed
-// by the http.FileSystem interface.
-func containsDotFile(name string) bool {
-	parts := strings.Split(name, "/")
-	for _, part := range parts {
-		if strings.HasPrefix(part, ".") {
-			return true
-		}
-	}
-	return false
-}
-
-// dotFileHidingFile is the http.File use in dotFileHidingFileSystem.
-// It is used to wrap the Readdir method of http.File so that we can
-// remove files and directories that start with a period from its output.
-type dotFileHidingFile struct {
+type aContainsFile struct {
 	http.File
 }
 
-// Readdir is a wrapper around the Readdir method of the embedded File
-// that filters out all files that start with a period in their name.
-func (f dotFileHidingFile) Readdir(n int) (fis []fs.FileInfo, err error) {
-	files, err := f.File.Readdir(n)
-	for _, file := range files { // Filters out the dot files
-		// if !strings.HasPrefix(file.Name(), ".") {
-		fis = append(fis, file)
-		// }
-	}
-	return
+type aList struct {
+	index int
+	fname string
+	file  fs.FileInfo
 }
 
-// dotFileHidingFileSystem is an http.FileSystem that hides
-// hidden "dot files" from being served.
-type dotFileHidingFileSystem struct {
+func (f aContainsFile) Readdir(n int) (fis []fs.FileInfo, err error) {
+	var wg sync.WaitGroup
+	var fileList []aList
+	// min := make(chan bool)
+	var min int
+	min = math.MaxInt32
+
+	files, err := f.File.Readdir(n)
+	if err != nil {
+		log.Fatal(err)
+	}
+	wg.Add(len(files))
+	for _, file := range files {
+		go readByChunkAndFindA(&fis, file, file.Name(), &wg, &fileList, &min)
+	}
+	wg.Wait()
+
+	fmt.Println("fileList: ", fileList)
+	if len(fileList) == 0 {
+		return nil, errors.New("no files found")
+	}
+
+	fmt.Println("min :", min)
+
+	for _, file := range fileList {
+		if file.index == min {
+			fis = append(fis, fs.FileInfo(file.file))
+		}
+	}
+
+	return fis, nil
+}
+
+func readByChunkAndFindA(fis *[]fs.FileInfo, file fs.FileInfo, filename string, wg *sync.WaitGroup, fileList *[]aList, min *int) {
+	defer wg.Done()
+
+	f, err := os.OpenFile(fmt.Sprintf("temp/%s", filename), os.O_RDONLY, 0666)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer f.Close()
+
+	buffer := make([]byte, BufferSize)
+
+	counter := 0
+	for {
+		bytesread, err := f.Read(buffer)
+
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println(err)
+			}
+			break
+		}
+
+		if *min < BufferSize*counter {
+			return
+		}
+
+		if strings.Contains(string(buffer[:bytesread]), "a") {
+			idx := strings.Index(string(buffer[:bytesread]), "a") + counter*BufferSize
+			if idx < *min {
+				*min = idx
+				fmt.Println("idx:", idx, " min:", *min)
+			}
+			*fileList = append(*fileList, aList{idx, filename, file})
+			return
+		}
+
+		counter += 1
+	}
+}
+
+type aContainsFileSystem struct {
 	http.FileSystem
 }
 
-// Open is a wrapper around the Open method of the embedded FileSystem
-// that serves a 403 permission error when name has a file or directory
-// with whose name starts with a period in its path.
-func (fsys dotFileHidingFileSystem) Open(name string) (http.File, error) {
-	// if containsDotFile(name) { // If dot file, return 403 response
-	// 	return nil, fs.ErrPermission
-	// }
+func (fsys aContainsFileSystem) Open(name string) (http.File, error) {
 
 	file, err := fsys.FileSystem.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	return dotFileHidingFile{file}, err
+	return aContainsFile{file}, err
 }
 
 func main() {
-	fsys := dotFileHidingFileSystem{http.Dir("./temp")}
+	fsys := aContainsFileSystem{http.Dir("./temp")}
 	http.Handle("/", http.FileServer(fsys))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
