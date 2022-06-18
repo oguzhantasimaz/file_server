@@ -30,7 +30,7 @@ func (f aContainsFile) Readdir(n int) (fis []fs.FileInfo, err error) {
 	var fileList []aList
 	// min := make(chan bool)
 	var min int
-	min = math.MaxInt32
+	min = math.MaxInt
 
 	files, err := f.File.Readdir(n)
 	if err != nil {
@@ -42,9 +42,8 @@ func (f aContainsFile) Readdir(n int) (fis []fs.FileInfo, err error) {
 	}
 	wg.Wait()
 
-	fmt.Println("fileList: ", fileList)
 	if len(fileList) == 0 {
-		return nil, errors.New("no files found")
+		return nil, errors.New("no files found with letter 'a'")
 	}
 
 	fmt.Println("min :", min)
@@ -90,8 +89,12 @@ func readByChunkAndFindA(fis *[]fs.FileInfo, file fs.FileInfo, filename string, 
 			if idx < *min {
 				*min = idx
 				fmt.Println("idx:", idx, " min:", *min)
+				*fileList = append(*fileList, aList{idx, filename, file})
+			} else if idx == *min {
+				*fileList = append(*fileList, aList{idx, filename, file})
+			} else {
+				return // no need to read more
 			}
-			*fileList = append(*fileList, aList{idx, filename, file})
 			return
 		}
 
@@ -104,7 +107,6 @@ type aContainsFileSystem struct {
 }
 
 func (fsys aContainsFileSystem) Open(name string) (http.File, error) {
-
 	file, err := fsys.FileSystem.Open(name)
 	if err != nil {
 		return nil, err
@@ -114,6 +116,7 @@ func (fsys aContainsFileSystem) Open(name string) (http.File, error) {
 
 func main() {
 	fsys := aContainsFileSystem{http.Dir("./temp")}
+
 	http.Handle("/", http.FileServer(fsys))
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
