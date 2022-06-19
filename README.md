@@ -51,4 +51,4 @@ A brief description of the layout:
 
 ## Notes
 
-* Currently program does not download files only shows file/files with char "a" on earlier position than other files.
+* Currently the program does not download files, only shows file/files with char "a" in an earlier position than other files.
