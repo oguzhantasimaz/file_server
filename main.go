@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -114,8 +115,18 @@ func (fsys aContainsFileSystem) Open(name string) (http.File, error) {
 }
 
 func main() {
+	host, ok := os.LookupEnv("HOST")
+	if !ok {
+		host = "0.0.0.0"
+	}
+	port, ok := os.LookupEnv("PORT")
+	if !ok {
+		port = "5000"
+	}
+	listenAddress := net.JoinHostPort(host, port)
+
 	fsys := aContainsFileSystem{http.Dir("./temp")}
 
 	http.Handle("/", http.FileServer(fsys))
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
