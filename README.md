@@ -10,7 +10,7 @@ Working example: [Heroku Deployed Example](https://gofileserver.herokuapp.com/)
 
 ### Design
 
-This project runs on [FileServer](https://pkg.go.dev/net/http#example-FileServer). FileServer read files chunk by chunk with concurreny methods to find character "a". 
+This project runs on [FileServer](https://pkg.go.dev/net/http#example-FileServer). FileServer read files chunk by chunk with concurrency methods to find character "a". 
 
 ### Status
 
@@ -24,7 +24,7 @@ To run the project in your local use the following commands
 docker build -t file_server .
 ```
 ```
-docker run -p 8080:8080 file_server
+docker run -p 5000:5000 file_server
 ```
 
 ### Layout
