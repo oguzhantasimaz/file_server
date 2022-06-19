@@ -4,6 +4,8 @@
 
 This project show files which containing char "a" on earlier position than other files. Files located in "temp" folder.
 
+Currently program builds, pushes and releases a Docker container to Heroku on commit to main branch.
+
 Working example: [Heroku Deployed Example](https://gofileserver.herokuapp.com/)
 
 ### Design
