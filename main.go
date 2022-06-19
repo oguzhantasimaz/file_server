@@ -88,7 +88,6 @@ func readByChunkAndFindA(fis *[]fs.FileInfo, file fs.FileInfo, filename string, 
 			idx := strings.Index(string(buffer[:bytesread]), "a") + counter*BufferSize
 			if idx < *min {
 				*min = idx
-				fmt.Println("idx:", idx, " min:", *min)
 				*fileList = append(*fileList, aList{idx, filename, file})
 			} else if idx == *min {
 				*fileList = append(*fileList, aList{idx, filename, file})
